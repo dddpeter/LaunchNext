@@ -24,6 +24,7 @@
 		A1E2B5C82F4A8A1B00F12345 /* ru */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ru; path = ru.lproj/Localizable.strings; sourceTree = "<group>"; };
 		A1E2B5C92F4A8A1B00F12345 /* hi */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = hi; path = hi.lproj/Localizable.strings; sourceTree = "<group>"; };
 		A1E2B5CA2F4A8A1B00F12345 /* vi */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = vi; path = vi.lproj/Localizable.strings; sourceTree = "<group>"; };
+		A1E2B5CC2F4A8A1B00F12345 /* pt-BR */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "pt-BR"; path = "pt-BR.lproj/Localizable.strings"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -121,6 +122,7 @@
 				hi,
 				vi,
 				it,
+				"pt-BR",
 			);
 			mainGroup = 0D1B0B372E4CDE460083EEF9;
 			minimizedProjectReferenceProxies = 1;
@@ -203,6 +205,7 @@
 				A1E2B5C82F4A8A1B00F12345 /* ru */,
 				A1E2B5C92F4A8A1B00F12345 /* hi */,
 				A1E2B5CA2F4A8A1B00F12345 /* vi */,
+				A1E2B5CC2F4A8A1B00F12345 /* pt-BR */,
 			);
 			name = Localizable.strings;
 			sourceTree = "<group>";
