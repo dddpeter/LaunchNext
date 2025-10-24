@@ -159,6 +159,8 @@ final class AppStore: ObservableObject {
     private static let soundLaunchpadCloseKey = "soundLaunchpadCloseSound"
     private static let soundNavigationKey = "soundNavigationSound"
     private static let voiceFeedbackEnabledKey = "voiceFeedbackEnabled"
+    private static let folderDropZoneScaleKey = "folderDropZoneScale"
+    private static let pageIndicatorTopPaddingKey = "pageIndicatorTopPadding"
 
     private static func loadHiddenApps() -> Set<String> {
         if let array = UserDefaults.standard.array(forKey: hiddenAppsKey) as? [String] {
@@ -196,6 +198,10 @@ final class AppStore: ObservableObject {
     static let folderPopoverHeightRange: ClosedRange<Double> = 0.6...0.95
     private static let defaultFolderPopoverWidth: Double = 0.9
     private static let defaultFolderPopoverHeight: Double = 0.85
+    static let folderDropZoneScaleRange: ClosedRange<Double> = 0.6...2.0
+    static let defaultFolderDropZoneScale: Double = 1.6
+    static let pageIndicatorTopPaddingRange: ClosedRange<Double> = 0...60
+    static let defaultPageIndicatorTopPadding: Double = 12
     private static let lastUpdateCheckKey = "lastUpdateCheckTimestamp"
     private static let automaticUpdateInterval: TimeInterval = 60 * 60 * 24
     private static let defaultLaunchpadOpenSound = "Submarine"
@@ -427,6 +433,14 @@ final class AppStore: ObservableObject {
         min(max(value, folderPopoverHeightRange.lowerBound), folderPopoverHeightRange.upperBound)
     }
 
+    private static func clampFolderDropZoneScale(_ value: Double) -> Double {
+        min(max(value, folderDropZoneScaleRange.lowerBound), folderDropZoneScaleRange.upperBound)
+    }
+
+    private static func clampPageIndicatorTopPadding(_ value: Double) -> Double {
+        min(max(value, pageIndicatorTopPaddingRange.lowerBound), pageIndicatorTopPaddingRange.upperBound)
+    }
+
     // 图标标题显示
     @Published var showLabels: Bool = {
         if UserDefaults.standard.object(forKey: "showLabels") == nil { return true }
@@ -508,6 +522,28 @@ final class AppStore: ObservableObject {
         return UserDefaults.standard.bool(forKey: "enableDropPrediction")
     }() {
         didSet { UserDefaults.standard.set(enableDropPrediction, forKey: "enableDropPrediction") }
+    }
+
+    @Published var folderDropZoneScale: Double = AppStore.defaultFolderDropZoneScale {
+        didSet {
+            let clamped = Self.clampFolderDropZoneScale(folderDropZoneScale)
+            if folderDropZoneScale != clamped {
+                folderDropZoneScale = clamped
+                return
+            }
+            UserDefaults.standard.set(folderDropZoneScale, forKey: Self.folderDropZoneScaleKey)
+        }
+    }
+
+    @Published var pageIndicatorTopPadding: Double = AppStore.defaultPageIndicatorTopPadding {
+        didSet {
+            let clamped = Self.clampPageIndicatorTopPadding(pageIndicatorTopPadding)
+            if pageIndicatorTopPadding != clamped {
+                pageIndicatorTopPadding = clamped
+                return
+            }
+            UserDefaults.standard.set(pageIndicatorTopPadding, forKey: Self.pageIndicatorTopPaddingKey)
+        }
     }
 
     @Published var enableAnimations: Bool = {
@@ -1267,6 +1303,17 @@ final class AppStore: ObservableObject {
         let clampedRowSpacing = Self.clampRowSpacing(storedRowSpacing)
         self.iconRowSpacing = clampedRowSpacing
         defaults.set(clampedRowSpacing, forKey: Self.rowSpacingKey)
+        let storedDropZoneScale = defaults.object(forKey: Self.folderDropZoneScaleKey) as? Double ?? Self.defaultFolderDropZoneScale
+        let clampedDropZoneScale = Self.clampFolderDropZoneScale(storedDropZoneScale)
+        self.folderDropZoneScale = clampedDropZoneScale
+        defaults.set(clampedDropZoneScale, forKey: Self.folderDropZoneScaleKey)
+        if defaults.object(forKey: Self.pageIndicatorTopPaddingKey) == nil {
+            defaults.set(Self.defaultPageIndicatorTopPadding, forKey: Self.pageIndicatorTopPaddingKey)
+        }
+        let storedTopPadding = defaults.object(forKey: Self.pageIndicatorTopPaddingKey) as? Double ?? Self.defaultPageIndicatorTopPadding
+        let clampedTopPadding = Self.clampPageIndicatorTopPadding(storedTopPadding)
+        self.pageIndicatorTopPadding = clampedTopPadding
+        defaults.set(clampedTopPadding, forKey: Self.pageIndicatorTopPaddingKey)
         // 读取图标缩放默认值
         if let v = UserDefaults.standard.object(forKey: "iconScale") as? Double {
             self.iconScale = v
@@ -1603,7 +1650,10 @@ final class AppStore: ObservableObject {
         // 创建新应用列表，但保持现有顺序
         var updatedApps: [AppInfo] = []
         var newAppsToAdd: [AppInfo] = []
-        let freshMap: [String: AppInfo] = Dictionary(uniqueKeysWithValues: newApps.map { ($0.url.path, $0) })
+        var freshMap: [String: AppInfo] = [:]
+        for app in newApps {
+            freshMap[app.url.path] = app
+        }
 
         // 第一步：保持现有顺序，同时用最新扫描结果刷新应用信息
         for app in self.apps {
@@ -2399,24 +2449,39 @@ final class AppStore: ObservableObject {
             }
         }
         
-        // 将应用重新添加到应用列表
-        apps.append(app)
+        // 将应用重新添加到应用列表（若已存在则更新，避免重复）
+        if let existingIndex = apps.firstIndex(where: { $0.url == app.url }) {
+            apps[existingIndex] = app
+        } else {
+            apps.append(app)
+        }
         apps.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
 
-        // 若删除文件夹后留下空槽，优先在原位置补位，避免跨页移动
+        // 优先使用记录的空槽，其次寻找其它空槽，最后追加新槽
+        var targetSlot: Int? = nil
         if let firstEmptied = emptiedSlots.first, firstEmptied < items.count {
-            items[firstEmptied] = .app(app)
+            targetSlot = firstEmptied
+        } else {
+            targetSlot = items.firstIndex {
+                if case .empty = $0 { return true }
+                return false
+            }
+        }
+        if let slot = targetSlot {
+            items[slot] = .app(app)
+        } else {
+            items.append(.app(app))
         }
 
         // 立即触发文件夹更新，通知所有相关视图刷新图标和名称
         triggerFolderUpdate()
 
-        // 触发网格视图刷新，确保界面立即更新
-        triggerGridRefresh()
-
         // 仅在页内压缩空槽
         compactItemsWithinPages()
         removeEmptyPages()
+
+        // 触发网格视图刷新，确保界面立即更新
+        triggerGridRefresh()
 
         // 刷新缓存，确保搜索时能找到从文件夹移除的应用（在重建之后刷新）
         refreshCacheAfterFolderOperation()
@@ -4189,6 +4254,7 @@ final class AppStore: ObservableObject {
         alert.addButton(withTitle: localized(.downloadUpdate))
         alert.addButton(withTitle: localized(.cancel))
 
+        
         guard alert.runModal() == .alertFirstButtonReturn else { return }
 
         do {

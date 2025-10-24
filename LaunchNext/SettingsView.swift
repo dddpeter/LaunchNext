@@ -106,6 +106,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
     case appSources
     case hiddenApps
     case development
+    case aiLab
     case sound
     case gameController
     case updates
@@ -124,6 +125,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         case .titles: return "text.badge.plus"
         case .hiddenApps: return "eye.slash"
         case .development: return "hammer"
+        case .aiLab: return "sparkles"
         case .updates: return "arrow.down.circle"
         case .about: return "info.circle"
         }
@@ -150,6 +152,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             colors = [Color(red: 0.29, green: 0.39, blue: 0.96), Color(red: 0.11, green: 0.67, blue: 0.91)]
         case .development:
             colors = [Color(red: 0.98, green: 0.58, blue: 0.16), Color(red: 0.96, green: 0.20, blue: 0.24)]
+        case .aiLab:
+            colors = [Color(red: 0.39, green: 0.33, blue: 0.98), Color(red: 0.59, green: 0.73, blue: 0.99)]
         case .updates:
             colors = [Color(red: 0.22, green: 0.78, blue: 0.55), Color(red: 0.10, green: 0.62, blue: 0.91)]
         case .about:
@@ -169,6 +173,7 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         case .titles: return .settingsSectionTitles
         case .hiddenApps: return .settingsSectionHiddenApps
         case .development: return .settingsSectionDevelopment
+        case .aiLab: return .settingsSectionAI
         case .updates: return .settingsSectionUpdates
         case .about: return .settingsSectionAbout
         }
@@ -231,6 +236,8 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
             hiddenAppsSection
         case .development:
             developmentSection
+        case .aiLab:
+            aiLabSection
         case .sound:
             soundSection
         case .gameController:
@@ -403,6 +410,23 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private var aiLabSection: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(appStore.localized(.aiSectionContextVision))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color(nsColor: .quaternarySystemFill))
+            )
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var performanceSection: some View {
@@ -1299,7 +1323,6 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                         .labelsHidden()
                         .toggleStyle(.switch)
                 }
-
                 HStack {
                     Text(appStore.localized(.enableAnimations))
                     Spacer()
@@ -1315,6 +1338,15 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                         .labelsHidden()
                         .toggleStyle(.switch)
                 }
+
+                HStack {
+                    Text(appStore.localized(.rememberPageTitle))
+                    Spacer()
+                    Toggle("", isOn: $appStore.rememberLastPage)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
+
 
                 HStack {
                     Text(appStore.localized(.hoverMagnification))
@@ -1567,9 +1599,6 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                         .foregroundStyle(.secondary)
                 }
 
-                Toggle(appStore.localized(.rememberPageTitle), isOn: $appStore.rememberLastPage)
-                    .toggleStyle(.switch)
-
                 VStack(alignment: .leading, spacing: 8) {
                     Text(appStore.localized(.labelFontSize))
                         .font(.headline)
@@ -1593,6 +1622,27 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
+                    Text(String(format: appStore.localized(.folderDropZoneSizeWithDefault), AppStore.defaultFolderDropZoneScale))
+                    Slider(value: $appStore.folderDropZoneScale,
+                           in: AppStore.folderDropZoneScaleRange,
+                           step: 0.05)
+                    HStack {
+                        Text(String(format: "%.1fx", AppStore.folderDropZoneScaleRange.lowerBound))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(String(format: "%.2fx", appStore.folderDropZoneScale))
+                            .font(.footnote.monospacedDigit())
+                        Spacer()
+                        Text(String(format: "%.1fx", AppStore.folderDropZoneScaleRange.upperBound))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    Text(appStore.localized(.folderDropZoneSizeHint))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                VStack(alignment: .leading, spacing: 8) {
                     Text(appStore.localized(.pageIndicatorOffsetLabel))
                         .font(.headline)
                     Slider(value: $appStore.pageIndicatorOffset, in: 0...80)
@@ -1604,6 +1654,21 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
                         Text("80").font(.footnote)
                     }
                 }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(appStore.localized(.pageIndicatorTopPaddingLabel))
+                        .font(.headline)
+                    Slider(value: $appStore.pageIndicatorTopPadding,
+                           in: AppStore.pageIndicatorTopPaddingRange)
+                    HStack {
+                        Text(String(format: "%.0f", AppStore.pageIndicatorTopPaddingRange.lowerBound)).font(.footnote)
+                        Spacer()
+                        Text(String(format: "%.0f", appStore.pageIndicatorTopPadding)).font(.footnote)
+                        Spacer()
+                        Text(String(format: "%.0f", AppStore.pageIndicatorTopPaddingRange.upperBound)).font(.footnote)
+                    }
+                }
+
             }
         }
     }

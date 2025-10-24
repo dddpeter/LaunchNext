@@ -551,6 +551,7 @@ struct LaunchpadView: View {
                                 }
                         }
                     }
+                    .padding(.top, CGFloat(appStore.pageIndicatorTopPadding))
                     .padding(.bottom, CGFloat(appStore.pageIndicatorOffset))
                     .opacity(isFolderOpen ? 0.1 : 1)
                     .allowsHitTesting(!isFolderOpen)
@@ -1818,7 +1819,8 @@ extension LaunchpadView {
         let now = Date()
         if now.timeIntervalSince(Self.lastGeometryUpdate) < geometryCacheTimeout,
            let cached = Self.geometryCache[cacheKey] {
-            let centerAreaSize = iconSize * 1.6
+            let scale = CGFloat(appStore.folderDropZoneScale)
+            let centerAreaSize = iconSize * scale
             let centerAreaRect = CGRect(
                 x: cached.x - centerAreaSize / 2,
                 y: cached.y - centerAreaSize / 2,
@@ -1829,7 +1831,7 @@ extension LaunchpadView {
         }
         
         let targetCenter = cellCenter(for: targetIndex, in: containerSize, pageIndex: pageIndex, columnWidth: columnWidth, appHeight: appHeight)
-        let scale: CGFloat = 1.6
+        let scale = CGFloat(appStore.folderDropZoneScale)
         let centerAreaSize = iconSize * scale
         let centerAreaRect = CGRect(
             x: targetCenter.x - centerAreaSize / 2,
