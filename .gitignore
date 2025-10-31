@@ -24,3 +24,7 @@ UpdaterScripts/SwiftUpdater/.build-*/
 
 # Parallel sources
 parallel_version/
+.idea/
+.cursor/
+.cursorrules
+.vscode/
