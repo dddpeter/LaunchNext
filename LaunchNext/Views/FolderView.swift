@@ -84,31 +84,31 @@ struct FolderView: View {
         isKeyboardNavigationActive = false
       }
     }
-    .onChange(of: isTextFieldFocused) { focused in
-      if !focused, isEditingName {
+    .onChange(of: isTextFieldFocused) { _, isFocused in
+      if !isFocused, isEditingName {
         finishEditing()
       }
     }
-    .onChange(of: folder.apps) {
+    .onChange(of: folder.apps) { _, _ in
       clampSelection()
       // 当应用列表变化时，强制刷新视图
       forceRefreshTrigger = UUID()
     }
-    .onChange(of: folder.name) {
+    .onChange(of: folder.name) { _, updatedName in
       // 监听文件夹名称变化，确保界面立即更新
       if !isEditingName {
-        folderName = folder.name
+        folderName = updatedName
         // 强制刷新视图
         forceRefreshTrigger = UUID()
       }
     }
-    .onChange(of: appStore.folderUpdateTrigger) {
+    .onChange(of: appStore.folderUpdateTrigger) { _, _ in
       // 强制刷新文件夹视图，确保图标和名称显示最新状态
       forceRefreshTrigger = UUID()
       // 触发视图重新渲染
       folderName = folder.name
     }
-    .onChange(of: appStore.gridRefreshTrigger) {
+    .onChange(of: appStore.gridRefreshTrigger) { _, _ in
       // 强制刷新网格视图，确保应用图标和布局显示最新状态
       forceRefreshTrigger = UUID()
       // 触发视图重新渲染
@@ -218,7 +218,7 @@ struct FolderView: View {
       .scrollIndicators(.hidden)
       .disabled(isEditingName) // 编辑状态下禁用滚动
       .onAppear { columnsCount = desiredColumns }
-      .onChange(of: geo.size) { _ in columnsCount = desiredColumns }
+      .onChange(of: geo.size) { _, _ in columnsCount = desiredColumns }
 
       // 拖拽预览层
       if let draggingApp {
@@ -581,24 +581,26 @@ extension FolderView {
         clampSelection()
         return nil
       }
-      moveSelection(dx: 0, dy: 1)
+      moveSelection(horizontalOffset: 0, verticalOffset: 1)
       return nil
     }
 
     // 左右/一般箭头
-    if let (dx, dy) = arrowDelta(for: event.keyCode) {
+    if let offset = navigationOffset(for: event.keyCode) {
       guard isKeyboardNavigationActive else { return event }
-      moveSelection(dx: dx, dy: dy)
+      moveSelection(horizontalOffset: offset.horizontalOffset, verticalOffset: offset.verticalOffset)
       return nil
     }
 
     return event
   }
 
-  private func moveSelection(dx: Int, dy: Int) {
+  private func moveSelection(horizontalOffset: Int, verticalOffset: Int) {
     guard let current = selectedIndex else { return }
-    let columnsCount = max(columnsCount, 1)
-    let newIndex: Int = dy == 0 ? current + dx : current + dy * columnsCount
+    let clampedColumns = max(columnsCount, 1)
+    let newIndex: Int = verticalOffset == 0
+      ? current + horizontalOffset
+      : current + verticalOffset * clampedColumns
     guard folder.apps.indices.contains(newIndex) else { return }
     selectedIndex = newIndex
   }

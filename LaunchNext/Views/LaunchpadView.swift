@@ -182,11 +182,9 @@ struct LaunchpadView: View {
           searchedApps.insert(app.url.path)
         }
       case let .missingApp(placeholder):
-        if placeholder.displayName.localizedCaseInsensitiveContains(query) {
-          if !searchedApps.contains(placeholder.bundlePath) {
-            result.append(.missingApp(placeholder))
-            searchedApps.insert(placeholder.bundlePath)
-          }
+        if placeholder.displayName.localizedCaseInsensitiveContains(query), !searchedApps.contains(placeholder.bundlePath) {
+          result.append(.missingApp(placeholder))
+          searchedApps.insert(placeholder.bundlePath)
         }
       case let .folder(folder):
         // 检查文件夹名称
@@ -198,18 +196,16 @@ struct LaunchpadView: View {
         let matchingApps = folder.apps.filter { app in
           app.name.localizedCaseInsensitiveContains(query)
         }
-        for app in matchingApps {
-          if !searchedApps.contains(app.url.path) {
-            // 确保应用对象有效且图标可用
-            let icon = app.icon.size.width > 0 ? app.icon : NSWorkspace.shared.icon(forFile: app.url.path)
-            let validApp = AppInfo(
-              name: app.name,
-              icon: icon,
-              url: app.url,
-            )
-            result.append(.app(validApp))
-            searchedApps.insert(app.url.path)
-          }
+        for app in matchingApps where !searchedApps.contains(app.url.path) {
+          // 确保应用对象有效且图标可用
+          let icon = app.icon.size.width > 0 ? app.icon : NSWorkspace.shared.icon(forFile: app.url.path)
+          let validApp = AppInfo(
+            name: app.name,
+            icon: icon,
+            url: app.url,
+          )
+          result.append(.app(validApp))
+          searchedApps.insert(app.url.path)
         }
       case .empty:
         break
@@ -248,29 +244,29 @@ struct LaunchpadView: View {
     let localIndex = max(0, min(localIndexDesired, pageSlices[targetPage].count))
     pageSlices[targetPage].insert(dragging, at: localIndex)
 
-    var p = targetPage
-    while p < pageSlices.count {
-      if pageSlices[p].count > itemsPerPage {
-        let spilled = pageSlices[p].removeLast()
-        if p + 1 >= pageSlices.count { pageSlices.append([]) }
-        pageSlices[p + 1].insert(spilled, at: 0)
-        p += 1
+    var pageIterator = targetPage
+    while pageIterator < pageSlices.count {
+      if pageSlices[pageIterator].count > itemsPerPage {
+        let spilloverItem = pageSlices[pageIterator].removeLast()
+        if pageIterator + 1 >= pageSlices.count { pageSlices.append([]) }
+        pageSlices[pageIterator + 1].insert(spilloverItem, at: 0)
+        pageIterator += 1
       } else {
-        p += 1
+        pageIterator += 1
       }
     }
 
-    var transformed = pageSlices
-    for pageIndex in transformed.indices {
-      for itemIndex in transformed[pageIndex].indices {
-        if transformed[pageIndex][itemIndex] == dragging {
+    var transformedPages = pageSlices
+    for pageIndex in transformedPages.indices {
+      for itemIndex in transformedPages[pageIndex].indices {
+        if transformedPages[pageIndex][itemIndex] == dragging {
           let placeholderToken = "dragging-placeholder-\(dragging.id)-\(pageIndex)-\(itemIndex)"
-          transformed[pageIndex][itemIndex] = .empty(placeholderToken)
+          transformedPages[pageIndex][itemIndex] = .empty(placeholderToken)
         }
       }
     }
 
-    return transformed.flatMap(\.self)
+    return transformedPages.flatMap(\.self)
   }
 
   private func makePages(from items: [LaunchpadItem]) -> [[LaunchpadItem]] {
@@ -399,9 +395,9 @@ struct LaunchpadView: View {
           let effectivePageWidth = geo.size.width + config.pageSpacing
 
           // Helper: decide whether to close when tapping at a point in grid space
-          let maybeCloseAt: (CGPoint) -> Void = { p in
+          let maybeCloseAt: (CGPoint) -> Void = { tapPoint in
             guard appStore.openFolder == nil, draggingItem == nil else { return }
-            if let idx = indexAt(point: p,
+            if let idx = indexAt(point: tapPoint,
                                  in: geo.size,
                                  pageIndex: appStore.currentPage,
                                  columnWidth: columnWidth,
@@ -500,8 +496,8 @@ struct LaunchpadView: View {
               // 失焦输入
               NSApp.keyWindow?.makeFirstResponder(nil)
               // 使用屏幕坐标换算为网格坐标，允许在空白处点击关闭
-              let p = convertScreenToGrid(NSEvent.mouseLocation)
-              closeIfTappedOnEmptyOrGap(at: p,
+              let pointerLocation = convertScreenToGrid(NSEvent.mouseLocation)
+              closeIfTappedOnEmptyOrGap(at: pointerLocation,
                                         geoSize: geo.size,
                                         columnWidth: columnWidth,
                                         appHeight: appHeight,
@@ -697,11 +693,11 @@ struct LaunchpadView: View {
 
         // 点击关闭：顶部区域（含搜索）不关闭；窗口四周边距点击关闭
         GeometryReader { proxy in
-          let w = proxy.size.width
-          let h = proxy.size.height
+          let containerWidth = proxy.size.width
+          let containerHeight = proxy.size.height
           let topSafe = max(0, headerTotalHeight)
-          let bottomPad = max(config.isFullscreen ? h * config.bottomPadding : 0, 24)
-          let sidePad = max(config.isFullscreen ? w * config.horizontalPadding : 0, 24)
+          let bottomPad = max(config.isFullscreen ? containerHeight * config.bottomPadding : 0, 24)
+          let sidePad = max(config.isFullscreen ? containerWidth * config.horizontalPadding : 0, 24)
 
           // 顶部安全区：透传
           VStack(spacing: 0) {
@@ -908,9 +904,9 @@ struct LaunchpadView: View {
     let screenPoint = appStore.handoffDragScreenLocation ?? NSEvent.mouseLocation
     let localPoint = convertScreenToGrid(screenPoint)
 
-    var tx = Transaction()
-    tx.disablesAnimations = true
-    withTransaction(tx) { draggingItem = .app(app) }
+    var animationTransaction = Transaction()
+    animationTransaction.disablesAnimations = true
+    withTransaction(animationTransaction) { draggingItem = .app(app) }
     isKeyboardNavigationActive = false
     appStore.isDragCreatingFolder = false
     appStore.folderCreationTarget = nil
@@ -936,9 +932,9 @@ struct LaunchpadView: View {
     handoffEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDragged, .leftMouseUp]) { event in
       switch event.type {
       case .leftMouseDragged:
-        let lp = convertScreenToGrid(NSEvent.mouseLocation)
+        let pointerLocation = convertScreenToGrid(NSEvent.mouseLocation)
         // 复用与普通拖拽相同的核心更新逻辑
-        applyDragUpdate(at: lp,
+        applyDragUpdate(at: pointerLocation,
                         containerSize: currentContainerSize,
                         columnWidth: currentColumnWidth,
                         appHeight: currentAppHeight,
@@ -961,10 +957,10 @@ struct LaunchpadView: View {
     let windowPoint = window.convertPoint(fromScreen: screenPoint)
     // SwiftUI 的 .global 顶部为原点，AppKit 窗口坐标底部为原点，需要翻转 y
     let windowHeight = window.contentView?.bounds.height ?? window.frame.size.height
-    let x = windowPoint.x - gridOriginInWindow.x
-    let yFromTop = windowHeight - windowPoint.y
-    let y = yFromTop - gridOriginInWindow.y
-    return CGPoint(x: x, y: y)
+    let horizontalPosition = windowPoint.x - gridOriginInWindow.x
+    let distanceFromTop = windowHeight - windowPoint.y
+    let verticalPosition = distanceFromTop - gridOriginInWindow.y
+    return CGPoint(x: horizontalPosition, y: verticalPosition)
   }
 
   private func handleHandoffDragMove(to localPoint: CGPoint) {
@@ -1436,7 +1432,7 @@ extension LaunchpadView {
         clampSelection()
         return nil
       }
-      moveSelection(dx: 0, dy: 1)
+      moveSelection(horizontalOffset: 0, verticalOffset: 1)
       return nil
     }
 
@@ -1452,14 +1448,15 @@ extension LaunchpadView {
           return nil
         }
       }
-      moveSelection(dx: 0, dy: -1)
+      moveSelection(horizontalOffset: 0, verticalOffset: -1)
       return nil
     }
 
     // 普通方向键导航（仅在非Shift状态下）
-    if !event.modifierFlags.contains(.shift), let (dx, dy) = arrowDelta(for: code) {
+    if !event.modifierFlags.contains(.shift),
+       let offset = navigationOffset(for: code) {
       guard isKeyboardNavigationActive else { return event }
-      moveSelection(dx: dx, dy: dy)
+      moveSelection(horizontalOffset: offset.horizontalOffset, verticalOffset: offset.verticalOffset)
       return nil
     }
 
@@ -1519,10 +1516,12 @@ extension LaunchpadView {
     _ = handleKeyEvent(event)
   }
 
-  private func moveSelection(dx: Int, dy: Int) {
+  private func moveSelection(horizontalOffset: Int, verticalOffset: Int) {
     guard let current = selectedIndex else { return }
     let columns = config.columns
-    let newIndex: Int = dy == 0 ? current + dx : current + dy * columns
+    let newIndex: Int = verticalOffset == 0
+      ? current + horizontalOffset
+      : current + verticalOffset * columns
     guard filteredItems.indices.contains(newIndex) else { return }
     guard newIndex != current else { return }
     selectedIndex = newIndex
@@ -2353,12 +2352,12 @@ struct DragPreviewItem: View {
 
 }
 
-func arrowDelta(for keyCode: UInt16) -> (dx: Int, dy: Int)? {
+func navigationOffset(for keyCode: UInt16) -> (horizontalOffset: Int, verticalOffset: Int)? {
   switch keyCode {
-  case 123: (-1, 0) // left
-  case 124: (1, 0) // right
-  case 126: (0, -1) // up
-  case 125: (0, 1) // down
+  case 123: (horizontalOffset: -1, verticalOffset: 0) // left
+  case 124: (horizontalOffset: 1, verticalOffset: 0) // right
+  case 126: (horizontalOffset: 0, verticalOffset: -1) // up
+  case 125: (horizontalOffset: 0, verticalOffset: 1) // down
   default: nil
   }
 }
@@ -2383,9 +2382,9 @@ extension LaunchpadView {
     guard !appStore.isLayoutLocked else { return }
     // 初始化拖拽
     if draggingItem == nil {
-      var tx = Transaction()
-      tx.disablesAnimations = true
-      withTransaction(tx) { draggingItem = item }
+      var animationTransaction = Transaction()
+      animationTransaction.disablesAnimations = true
+      withTransaction(animationTransaction) { draggingItem = item }
       isKeyboardNavigationActive = false
       appStore.isDragCreatingFolder = false
       appStore.folderCreationTarget = nil
@@ -2481,7 +2480,7 @@ extension LaunchpadView {
 
     // 处理普通拖拽逻辑
     if let finalIndex = pendingDropIndex,
-       let _ = filteredItems.firstIndex(of: dragging) {
+       filteredItems.contains(dragging) {
       // 检查是否为跨页拖拽
       let sourceIndexInItems = appStore.items.firstIndex(of: dragging) ?? 0
       let targetPage = finalIndex / config.itemsPerPage
